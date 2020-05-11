@@ -1,0 +1,133 @@
+trigger:
+- master
+name: $(Date:yyyyMMdd)$(Rev:.r)
+jobs:
+
+- job: 'Build'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      Phase: 'STARTED'
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Write your commands here
+        
+        echo 'Build Project'
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      Phase: 'COMPLETED'
+
+- job: 'Test'
+  dependsOn: 'Build'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Build'
+      Phase: 'STARTED'
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Write your commands here
+        
+        echo 'Test Project'
+  - task: ServiceNow-DevOps-Agent-Artifact-Registration@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      artifactsPayload: |
+        {
+           "artifacts": [
+              {
+                 "name": "tarun-scripted-echo",
+                 "version": "1.$(Build.BuildId).0",
+                 "semanticVersion": "1.$(Build.BuildId).0",
+                 "repositoryName": "tarun-maven-releases"
+              }
+           ]
+        }
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Build'
+      Phase: 'COMPLETED'
+
+- job: "Deploy"
+  dependsOn: 'Test'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Test'
+      Phase: 'STARTED'
+  - task: ServiceNow-DevOps-Agent-Package-Registration@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      packageName: 'tarun-scripted-echo-pkg-$(build.buildId)'
+      artifactsPayload: |
+        {
+            "artifacts": [
+            {
+                "name": "tarun-scripted-echo",
+                "repositoryName": "tarun-maven-releases",
+                "version": "1.$(Build.BuildId).0",
+                "pipelineName":"$(system.teamProject)/$(build.definitionName)",
+                "taskExecutionNumber":"$(build.buildId)",
+                "stageName":"$(system.jobDisplayName)",
+                "branchName":"$(build.sourceBranchName)"
+            }],
+            "pipelineName":"$(system.teamProject)/$(build.definitionName)",
+            "taskExecutionNumber":"$(build.buildId)",
+            "stageName":"$(system.jobDisplayName)",
+            "branchName":"$(build.sourceBranchName)"
+        }
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Write your commands here
+        
+        echo 'Deploy Project'
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Test'
+      Phase: 'COMPLETED'
+
+- job: "Prod"
+  dependsOn: "Deploy"
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Deploy'
+      Phase: 'STARTED'
+  - task: Bash@3
+    inputs:
+      targetType: 'inline'
+      script: |
+        # Write your commands here
+        
+        echo 'Prod Project'
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'DevOpsPOA'
+      upstream: 'Deploy'
+      Phase: 'COMPLETED'
+
+
+  
+  
+
+
+
+
+  
+
+
+
+  

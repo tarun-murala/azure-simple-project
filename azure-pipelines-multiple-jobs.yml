@@ -1,0 +1,110 @@
+trigger:
+- master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+jobs:
+- job: 'Build'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      Phase: 'STARTED'
+  - task: Maven@3
+    name: 'build'
+    displayName: 'Build'
+    inputs:
+      mavenPomFile: 'pom.xml'
+      mavenOptions: '-Xmx3072m'
+      javaHomeOption: 'JDKVersion'
+      jdkVersionOption: '1.8'
+      jdkArchitectureOption: 'x64'
+      publishJUnitResults: false
+      testResultsFiles: '**/TEST-*.xml'
+      goals: 'clean install'
+  - task: ServiceNow-DevOps-Agent-Artifact-Registration@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      artifactsPayload: |
+        {
+           "artifacts": [
+              {
+                 "name": "tarun-multi-job",
+                 "version": "1.$(Build.BuildId)",
+                 "semanticVersion": "1.$(Build.BuildId).0",
+                 "repositoryName": "tarun-maven-releases"
+              }
+           ]
+        }
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      Phase: 'COMPLETED'
+- job: 'Test'
+  dependsOn: 'Build'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      upstream: 'Build'
+      Phase: 'STARTED'
+  - task: Maven@3
+    inputs:
+      mavenPomFile: 'pom.xml'
+      goals: 'test'
+      publishJUnitResults: true
+      testResultsFiles: '**/surefire-reports/TEST-*.xml'
+      testRunTitle: 'Test'
+      javaHomeOption: 'JDKVersion'
+      mavenVersionOption: 'Default'
+      mavenAuthenticateFeed: false
+      effectivePomSkip: false
+      sonarQubeRunAnalysis: false
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      upstream: 'Build'
+      Phase: 'COMPLETED'
+- job: 'Deploy'
+  dependsOn: 'Test'
+  steps:
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      upstream: 'Test'
+      Phase: 'STARTED'
+  - task: ServiceNow-DevOps-Agent-Package-Registration@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      packageName: 'tarun-multi-job-pkg-$(Build.BuildId)'
+      artifactsPayload: |
+        {
+            "artifacts": [
+            {
+                "name": "tarun-multi-job",
+                "repositoryName": "tarun-maven-releases",
+                "version": "1.$(Build.BuildId)",
+                "currentBuildInfo": "true"
+            }]
+        }
+  
+  # - task: Maven@3
+  #   name: 'deploy'
+  #   displayName: 'Deploy'
+  #   inputs:
+  #     mavenPomFile: 'pom.xml'
+  #     mavenOptions: '-Xmx3072m'
+  #     javaHomeOption: 'JDKVersion'
+  #     jdkVersionOption: '1.8'
+  #     jdkArchitectureOption: 'x64'
+  #     publishJUnitResults: false
+  #     testResultsFiles: '**/TEST-*.xml'
+  #     goals: 'package'
+  - task: ServiceNow-DevOps-Agent-Job-Notification@1
+    inputs:
+      connectedServiceName: 'Emptmurala'
+      upstream: 'Test'
+      Phase: 'COMPLETED'
+  
